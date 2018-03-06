@@ -7,7 +7,34 @@ using namespace bdf;
 #include <map>
 using namespace std;
 
+struct A {
+    int a, b;
+};
+
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const A & a) {
+    return (s << a.a << a.b);
+}
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, A & a) {
+    return (s >> a.a >> a.b);
+}
+
 int main() {
+    {
+        stringstream ss;
+        auto s = serializer(ss);
+
+        vector<A> aa = {{1,2},{3,4},{5,6}};
+
+        s << aa;
+
+        vector<A> bb;
+        s >> bb;
+        ;
+
+    }
+
     if(0){
         std::vector<int> vv = {1,2,3,4,5};
         std::map<int,int> mm = {{1,11},{2,22},{3,33}};
@@ -15,8 +42,8 @@ int main() {
         int i = 666;
 
         stringstream ss;
-
         auto s = serializer(ss);
+
         s << vv << i << str << mm;
 
         for (const auto & i: vv) std::cout << i << ' ';

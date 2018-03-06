@@ -34,6 +34,9 @@ template<bool Enabled> struct Swapper;
 template<> struct Swapper<false> { template<typename T> static void swap(T &) {} };
 template<> struct Swapper<true > { template<typename T> static void swap(T & v) { swapBytes(v); } };
 
+/** Serializer class
+ *
+ */
 template<typename Stream, int Endian=BDF_SYSTEM_ENDIAN>
 struct Serializer {
 
@@ -50,20 +53,6 @@ struct Serializer {
         return *this;
     }
 
-    Self & operator << (const std::string & str) {
-        *this << str.size();
-        ss.write(&str[0],str.size());
-        return *this;
-    }
-
-    template<typename T1, typename T2>
-    Self & operator << (const std::pair<T1,T2> & p) { return (*this << p.first << p.second); }
-
-    template<typename T>
-    Self & operator << (const std::vector<T> & vv) { *this << vv.size(); for(auto it=vv.begin(); it!=vv.end(); ++it) *this << *it; return *this; }
-    template<typename T1, typename T2>
-    Self & operator << (const std::map<T1,T2> & mm) { *this << mm.size(); for(auto it=mm.begin(); it!=mm.end(); ++it) *this << *it; return *this; }
-
     // read
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
     Self & operator >> (T & v) {
@@ -72,45 +61,63 @@ struct Serializer {
         return *this;
     }
 
-    Self & operator >> (std::string & str) {
-        size_t n;
-        *this >> n;
-        str.resize(n);
-        ss.read(&str[0],n);
-        return *this;
-    }
-
-    template<typename T1, typename T2>
-    Self & operator >> (std::pair<T1,T2> & p) { return (*this >> p.first >> p.second); }
-
-    template<typename T>
-    Self & operator >> (std::vector<T> & vv) {
-        size_t n;
-        *this >> n;
-        vv.clear();
-        vv.resize(n);
-        for(size_t i=0; i<n; ++i)
-            *this >> vv[i];
-        return *this;
-    }
-    template<typename T1, typename T2>
-    Self & operator >> (std::map<T1,T2> & mm) {
-        size_t n;
-        *this >> n;
-        mm.clear();
-        std::pair<T1,T2> p;
-        for(size_t i=0; i<n; ++i) {
-            *this >> p;
-            mm[p.first] = p.second;
-        }
-        return *this;
-    }
-
-private:
     Stream & ss;
 };
 
+// constructor
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
 Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,Endian>(ss); }
+
+// std::string
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::string & str) {
+    s << str.size();
+    s.ss.write(&str[0],str.size());
+    return s;
+}
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::string & str) {
+    size_t n;
+    s >> n;
+    str.resize(n);
+    s.ss.read(&str[0],n);
+    return s;
+}
+
+// std::string
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::pair<T1,T2> & p) { return (s << p.first << p.second); }
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::pair<T1,T2> & p) { return (s >> p.first >> p.second); }
+
+// std::vector
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::vector<T> & vv) { s << vv.size(); for(auto it=vv.begin(); it!=vv.end(); ++it) s << *it; return s; }
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::vector<T> & vv) {
+    size_t n;
+    s >> n;
+    vv.clear();
+    vv.resize(n);
+    for(size_t i=0; i<n; ++i)
+        s >> vv[i];
+    return s;
+}
+
+// std::map
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::map<T1,T2> & mm) { s << mm.size(); for(auto it=mm.begin(); it!=mm.end(); ++it) s << *it; return s; }
+template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::map<T1,T2> & mm) {
+    size_t n;
+    s >> n;
+    mm.clear();
+    std::pair<T1,T2> p;
+    for(size_t i=0; i<n; ++i) {
+        s >> p;
+        mm[p.first] = p.second;
+    }
+    return s;
+}
 
 }   // namespace bdf
