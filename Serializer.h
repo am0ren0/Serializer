@@ -121,13 +121,13 @@ Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,End
 
 #define SERIALIZE_MEMBERS(_class_, ...)\
     template<int Endian, typename Stream>\
-    void write(Serializer<Stream,Endian> & s) const { s.write(__VA_ARGS__); }\
+    void write(femto::Serializer<Stream,Endian> & s) const { s.write(__VA_ARGS__); }\
     template<int Endian, typename Stream>\
-    friend Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const _class_ & obj) { obj.write(s); return s; }\
+    friend femto::Serializer<Stream,Endian> & operator << (femto::Serializer<Stream,Endian> & s, const _class_ & obj) { obj.write(s); return s; }\
     template<int Endian, typename Stream, typename ...T>\
-    void read(Serializer<Stream,Endian> & s) { s.read(__VA_ARGS__); }\
+    void read(femto::Serializer<Stream,Endian> & s) { s.read(__VA_ARGS__); }\
     template<int Endian, typename Stream>\
-    friend Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, _class_ & obj) { obj.read(s); return s; }
+    friend femto::Serializer<Stream,Endian> & operator >> (femto::Serializer<Stream,Endian> & s, _class_ & obj) { obj.read(s); return s; }
 
 }   // namespace bdf
 
