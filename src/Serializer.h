@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cassert>
-#include <iostream>
+#include <utility>
+#include <cstring>
 #include <string>
 #include <vector>
 #include <map>
-#include <cinttypes>
 
 namespace bdf {
 
@@ -23,7 +23,6 @@ template<int nBytes>
 void swapBytes(char *src);
 template<typename T>
 inline void swapBytes(T & src) { swapBytes<sizeof(T)>( reinterpret_cast<char *>(&src) ); }
-
 
 template<> inline void swapBytes<1>(char */*src*/) {}
 template<> inline void swapBytes<2>(char *src) { std::swap(src[0], src[1]); }
@@ -46,25 +45,59 @@ struct Serializer {
     }
 
     // write
+    void write(const char * str, size_t n) { ss.write(str,n); }
+
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
     Self & operator << (T v) {
-        Swapper<Endian!=BDF_SYSTEM_ENDIAN>::swap(v);
-        ss.write(reinterpret_cast<const char *>(&v), sizeof(T));
+        Swapper<Endian!=BDF_SYSTEM_ENDIAN>::swap(v);    // swapping the local copy of v
+        write(reinterpret_cast<const char *>(&v), sizeof(T));
+        return *this;
+    }
+    // literal strings. use write for buffers not ending with the null char
+    Self & operator << (const char * str) {
+        size_t n = std::strlen(str);    // assume null ended char string
+        *this << n;
+        write(&str[0],n);
         return *this;
     }
 
     // read
+    size_t read(char * str) {
+        size_t n;
+        *this >> n;
+        ss.read(str,n);
+        return n;
+    }
+    void read(char * str, size_t n) {
+        assert(n>0);
+        ss.read(str,n);
+    }
+
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
     Self & operator >> (T & v) {
-        ss.read(reinterpret_cast<char *>(&v), sizeof(T));
+        read(reinterpret_cast<char *>(&v), sizeof(T));
         Swapper<Endian!=BDF_SYSTEM_ENDIAN>::swap(v);
         return *this;
     }
+    // literal strings. use read for buffers to avoid adding null char at the end
+    Self & operator >> (char * str) {
+        size_t n = read(str);
+        str[n] = '\0';  // set null char at the end of the string
+        return *this;
+    }
 
+    template<typename T>
+    T && get() {
+        T v;
+        *this >> v;
+        return std::move(v);
+    }
+
+private:
     Stream & ss;
 };
 
-// constructor
+// utility constructor
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
 Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,Endian>(ss); }
 
@@ -72,7 +105,7 @@ Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,End
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::string & str) {
     s << str.size();
-    s.ss.write(&str[0],str.size());
+    s.write(&str[0],str.size());
     return s;
 }
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
@@ -80,11 +113,11 @@ Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::str
     size_t n;
     s >> n;
     str.resize(n);
-    s.ss.read(&str[0],n);
+    s.read(&str[0],n);
     return s;
 }
 
-// std::string
+// std::pair
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::pair<T1,T2> & p) { return (s << p.first << p.second); }
 template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream, typename T1, typename T2>
