@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string>
 
-namespace bdf {
+namespace femto {
 
 enum {
     BDF_LITTLE_ENDIAN,
@@ -141,7 +141,7 @@ template<class Key, class Value, class Comp, class Alloc>               class ma
 template<class Key, class Value, class Hash, class Pred, class Alloc>   class unordered_map;
 }
 
-namespace bdf {
+namespace femto {
 // std::string
 template<int Endian, typename Stream>
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::string & str) {
