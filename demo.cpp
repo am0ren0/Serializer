@@ -4,91 +4,69 @@ using namespace bdf;
 #include <iostream>
 #include <sstream>
 #include <vector>
-#include <map>
+#include <unordered_map>
 using namespace std;
 
-struct A {
-    int a, b;
-};
+struct DB {
+    typedef unsigned long Id;
+    struct Table {
+        struct Entry {
+            Entry(const string & data_="") : data(data_) {}
 
-template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
-Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const A & a) {
-    return (s << a.a << a.b);
-}
-template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
-Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, A & a) {
-    return (s >> a.a >> a.b);
-}
+            string data;
+        private:
+
+            SERIALIZE_MEMBERS(Entry, data)
+        };
+
+        Table(const string & descr_="") : _id(++lastId), _descr(descr_) {}
+        Id id() const { return _id; }
+        Entry & addEntry(const string & d="") { _entries.emplace_back(d); return _entries.back(); }
+    private:
+        static Id lastId;
+        Id _id;
+        string _descr;
+        vector<Entry> _entries;
+
+        SERIALIZE_MEMBERS(Table, _id, _descr, _entries)
+    };
+
+    Table & newTable(const string & descr="") { Table t(descr); return _tables[t.id()] = move(t); }
+private:
+    unordered_map<Id, Table> _tables;
+
+    SERIALIZE_MEMBERS(DB,_tables)
+};
+DB::Id DB::Table::lastId=0;
 
 int main() {
-    {
-        stringstream ss;
-        auto s = serializer(ss);
-
-        vector<A> aa = {{1,2},{3,4},{5,6}};
-
-        s << aa;
-
-        vector<A> bb;
-        s >> bb;
-        ;
-
-    }
+    stringstream ss;
+    auto s = serializer(ss);
 
     {
-        std::vector<int> vv = {1,2,3,4,5};
-        std::map<int,int> mm = {{1,11},{2,22},{3,33}};
-        string str = "hola";
-        int i = 666;
-
-        stringstream ss;
-        auto s = serializer(ss);
-
-        s << vv << i << "adios" << mm;
-
-        for (const auto & i: vv) std::cout << i << ' ';
-        cout << endl;
-        for (const auto & i: mm) std::cout << i.first << "=" << i.second << ' ';
-        cout << endl;
-        cout << i << endl;
-        cout << str << endl;
-
-        vv.clear();
-        mm.clear();
-        str.clear();
-        i = 0;
-
-        char cc[20];
-        memset(cc,-1,20);
-        s >> vv >> i >> cc >> mm;
-
-        for (const auto & i: vv) std::cout << i << ' ';
-        cout << endl;
-        for (const auto & i: mm) std::cout << i.first << "=" << i.second << ' ';
-        cout << endl;
-        cout << i << endl;
-        cout << cc << endl;
-    }
-
-    {
-        stringstream ss;
-        auto s = serializer<BDF_LITTLE_ENDIAN>(ss);
-
-        int a = 1;
-        s << a;
-        int b=0;
-        s >> b;
-        cout << b << endl;
-    }
-    {
-        stringstream ss;
-        auto s = serializer<BDF_BIG_ENDIAN>(ss);
-
-        int a = 1;
-        s << a;
-        int b=0;
-        s >> b;
-        cout << b << endl;
+        ss.clear();
+        {
+            DB db;
+            {
+                auto & t = db.newTable("First table");
+                t.addEntry("a");
+                t.addEntry("s");
+                t.addEntry("d");
+                t.addEntry("f");
+            }
+            {
+                auto & t = db.newTable("Second table");
+                t.addEntry("a");
+                t.addEntry("s");
+                t.addEntry("d");
+                t.addEntry("f");
+            }
+            s << db;
+        }
+        {
+            DB db;
+            s >> db;
+        }
     }
 
     return 0;
