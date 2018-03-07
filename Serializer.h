@@ -7,13 +7,13 @@
 
 namespace femto {
 
-enum {
-    BDF_LITTLE_ENDIAN,
-    BDF_BIG_ENDIAN,
+enum Endian {
+    FEMTO_LITTLE_ENDIAN,
+    FEMTO_BIG_ENDIAN,
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    BDF_SYSTEM_ENDIAN = BDF_LITTLE_ENDIAN
+    FEMTO_SYSTEM_ENDIAN = FEMTO_LITTLE_ENDIAN
 #else
-    BDF_SYSTEM_ENDIAN = BDF_BIG_ENDIAN
+    FEMTO_SYSTEM_ENDIAN = FEMTO_BIG_ENDIAN
 #endif
 };
 
@@ -39,7 +39,7 @@ struct Serializer {
 
     typedef Serializer<Stream,Endian> Self;
     Serializer(Stream & ss_) : ss(ss_) {
-        static_assert(Endian==BDF_LITTLE_ENDIAN || Endian==BDF_BIG_ENDIAN, "Invalid Endian");
+        static_assert(Endian==FEMTO_LITTLE_ENDIAN || Endian==FEMTO_BIG_ENDIAN, "Invalid Endian");
     }
 
     // write
@@ -57,7 +57,7 @@ struct Serializer {
 
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
     Self & operator << (T v) {
-        Swapper<Endian!=BDF_SYSTEM_ENDIAN>::swap(v);    // swapping the local copy of v
+        Swapper<Endian!=FEMTO_SYSTEM_ENDIAN>::swap(v);    // swapping the local copy of v
         write(reinterpret_cast<const char *>(&v), sizeof(T));
         return *this;
     }
@@ -94,7 +94,7 @@ struct Serializer {
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
     Self & operator >> (T & v) {
         read(reinterpret_cast<char *>(&v), sizeof(T));
-        Swapper<Endian!=BDF_SYSTEM_ENDIAN>::swap(v);
+        Swapper<Endian!=FEMTO_SYSTEM_ENDIAN>::swap(v);
         return *this;
     }
     // literal strings. use read for buffers to avoid adding null char at the end
@@ -116,7 +116,7 @@ private:
 };
 
 // utility constructor
-template<int Endian=BDF_SYSTEM_ENDIAN, typename Stream>
+template<int Endian=FEMTO_SYSTEM_ENDIAN, typename Stream>
 Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,Endian>(ss); }
 
 #define SERIALIZE_MEMBERS(_class_, ...)\
