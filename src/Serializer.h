@@ -43,16 +43,16 @@ struct Serializer {
     }
 
     // write
-    void write(const char * str, size_t n) { ss.write(str,n); }
+    Self & write(const char * str, size_t n) { ss.write(str,n); return *this;}
 
     template<typename T0, typename ...T>
-    void write(const T0 & a0, const T & ...aa) {
+    Self & write(const T0 & a0, const T & ...aa) {
         *this << a0;
-        write(aa...);
+        return write(aa...);
     }
     template<typename T>
-    void write(const T & a) {
-        *this << a;
+    Self & write(const T & a) {
+        return (*this << a);
     }
 
     template<typename T, typename std::enable_if< std::is_integral<T>{} || std::is_floating_point<T>{}, int>::type = 0>
@@ -133,16 +133,13 @@ Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,End
 
 // forward definitions of std classes
 namespace std {
-template <typename Value, typename Alloc>
-class vector;
-template<class T1, class T2>
-struct pair;
-template <typename Key, typename Value, typename Comp, typename Alloc>
-class map;
-template<class Key, class Value, class Hash, class Pred, class Alloc>
-class unordered_map;
+template<class Value, size_t N>                                         struct array;
+template<class Value, class Alloc>                                      class vector;
+template<class Key, class Comp, class Alloc>                            class set;
+template<class Key, class Hash, class Pred, class Alloc>                class unordered_set;
+template<class Key, class Value, class Comp, class Alloc>               class map;
+template<class Key, class Value, class Hash, class Pred, class Alloc>   class unordered_map;
 }
-
 
 namespace bdf {
 // std::string
@@ -154,8 +151,7 @@ Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const st
 }
 template<int Endian, typename Stream>
 Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::string & str) {
-    size_t n;
-    s >> n;
+    size_t n = s.template get<size_t>();
     str.resize(n);
     s.read(&str[0],n);
     return s;
@@ -167,17 +163,59 @@ Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const st
 template<int Endian, typename Stream, typename T1, typename T2>
 Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::pair<T1,T2> & p) { return (s >> p.first >> p.second); }
 
+// std::array
+template<int Endian, typename Stream, typename T, size_t N>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::array<T,N> & aa) {
+    for(int i=0; i<N; ++i)
+        s << aa[i];
+    return s;
+}
+template<int Endian, typename Stream, typename T, size_t N>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::array<T,N> & aa) {
+    for(int i=0; i<N; ++i)
+        s >> aa[i];
+    return s;
+}
+
 // std::vector
 template<int Endian, typename Stream, typename T, typename Alloc>
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::vector<T, Alloc> & vv) { s << vv.size(); for(auto it=vv.begin(); it!=vv.end(); ++it) s << *it; return s; }
 template<int Endian, typename Stream, typename T, typename Alloc>
 Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::vector<T, Alloc> & vv) {
-    size_t n;
-    s >> n;
+    size_t n = s.template get<size_t>();
     vv.clear();
     vv.resize(n);
     for(size_t i=0; i<n; ++i)
         s >> vv[i];
+    return s;
+}
+
+// std::set
+template<int Endian, typename Stream, typename T, typename Comp, typename Alloc>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::set<T, Comp, Alloc> & ss) { s << ss.size(); for(auto it=ss.begin(); it!=ss.end(); ++it) s << *it; return s; }
+template<int Endian, typename Stream, typename T, typename Comp, typename Alloc>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::set<T, Comp, Alloc> & ss) {
+    size_t n = s.template get<size_t>();
+    ss.clear();
+    auto prev = ss.cbegin();
+    for(size_t i=0; i<n; ++i) {
+        prev = ss.emplace_hint(prev,s.template get<T>());
+    }
+    return s;
+}
+
+// std::unordered_set
+template<int Endian, typename Stream, typename T, class Hash, class Pred, class Alloc>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::unordered_set<T, Hash,Pred,Alloc> & ss) { s << ss.size(); for(auto it=ss.begin(); it!=ss.end(); ++it) s << *it; return s; }
+template<int Endian, typename Stream, typename T, class Hash, class Pred, class Alloc>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::unordered_set<T, Hash,Pred,Alloc> & ss) {
+    size_t n = s.template get<size_t>();
+    ss.clear();
+    ss.reserve(n);
+    auto prev = ss.cbegin();
+    for(size_t i=0; i<n; ++i) {
+        prev = ss.emplace_hint(prev, s.template get<T>());
+    }
     return s;
 }
 
@@ -186,13 +224,12 @@ template<int Endian, typename Stream, typename T1, typename T2, typename Comp, t
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::map<T1,T2, Comp, Alloc> & mm) { s << mm.size(); for(auto it=mm.begin(); it!=mm.end(); ++it) s << *it; return s; }
 template<int Endian, typename Stream, typename T1, typename T2, typename Comp, typename Alloc>
 Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::map<T1,T2, Comp, Alloc> & mm) {
-    size_t n;
-    s >> n;
+    size_t n = s.template get<size_t>();
     mm.clear();
-    std::pair<T1,T2> p;
+    typedef std::pair<T1,T2> Pair;
+    auto prev = mm.cbegin();
     for(size_t i=0; i<n; ++i) {
-        s >> p;
-        mm[p.first] = p.second;
+        prev = mm.emplace_hint(prev, s.template get<Pair>());
     }
     return s;
 }
@@ -202,13 +239,13 @@ template<int Endian, typename Stream, typename T1, typename T2, class Hash, clas
 Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const std::unordered_map<T1,T2, Hash,Pred,Alloc> & mm) { s << mm.size(); for(auto it=mm.begin(); it!=mm.end(); ++it) s << *it; return s; }
 template<int Endian, typename Stream, typename T1, typename T2, class Hash, class Pred, class Alloc>
 Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::unordered_map<T1,T2, Hash,Pred,Alloc> & mm) {
-    size_t n;
-    s >> n;
+    size_t n = s.template get<size_t>();
     mm.clear();
-    std::pair<T1,T2> p;
+    mm.reserve(n);
+    typedef std::pair<T1,T2> Pair;
+    auto prev = mm.cbegin();
     for(size_t i=0; i<n; ++i) {
-        s >> p;
-        mm[p.first] = p.second;
+        prev = mm.emplace_hint(prev, s.template get<Pair>());
     }
     return s;
 }
