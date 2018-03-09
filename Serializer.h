@@ -31,6 +31,9 @@ template<bool Enabled> struct Swapper;
 template<> struct Swapper<false> { template<typename T> static void swap(T &) {} };
 template<> struct Swapper<true > { template<typename T> static void swap(T & v) { swapBytes(v); } };
 
+//###########################################################################
+// Serializer class
+//###########################################################################
 /** Serializer class
  *
  */
@@ -129,7 +132,11 @@ Serializer<Stream,Endian> serializer(Stream & ss) { return Serializer<Stream,End
     template<int Endian, typename Stream>\
     friend femto::Serializer<Stream,Endian> & operator >> (femto::Serializer<Stream,Endian> & s, _class_ & obj) { obj.read(s); return s; }
 
-}   // namespace bdf
+}   // namespace femto
+
+//###########################################################################
+// std classes serialization
+//###########################################################################
 
 // forward definitions of std classes
 namespace std {
@@ -250,4 +257,88 @@ Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, std::uno
     return s;
 }
 
-}   // namespace bdf
+}   // namespace femto
+
+//###########################################################################
+// Eigen Matrix serialization
+//###########################################################################
+
+// forward definitions of std classes
+namespace Eigen {
+template<typename _Scalar, int _Rows, int _Cols, int _Options, int _MaxRows, int _MaxCols> class Matrix;
+}
+
+namespace femto {
+// Eigen::Matrix
+template<int Endian, typename Stream, typename _Scalar, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const Eigen::Matrix<_Scalar, -1, -1, _Options, _MaxRows, _MaxCols> & mat) {
+    s << static_cast<u_int32_t>(mat.rows()) << static_cast<u_int32_t>(mat.cols());
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s << mat.coeff(r,c);
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Rows, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const Eigen::Matrix<_Scalar, _Rows, -1, _Options, _MaxRows, _MaxCols> & mat) {
+    s << static_cast<u_int32_t>(mat.cols());
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s << mat.coeff(r,c);
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Cols, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const Eigen::Matrix<_Scalar, -1, _Cols, _Options, _MaxRows, _MaxCols> & mat) {
+    s << static_cast<u_int32_t>(mat.rows());
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s << mat.coeff(r,c);
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Rows, int _Cols, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator << (Serializer<Stream,Endian> & s, const Eigen::Matrix<_Scalar, _Rows, _Cols, _Options, _MaxRows, _MaxCols> & mat) {
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s << mat.coeff(r,c);
+    return s;
+}
+
+
+template<int Endian, typename Stream, typename _Scalar, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, Eigen::Matrix<_Scalar, -1, -1, _Options, _MaxRows, _MaxCols> & mat) {
+    u_int32_t nRows = s.template get<u_int32_t>();
+    u_int32_t nCols = s.template get<u_int32_t>();
+    mat.resize(nRows,nCols);
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s >> mat.coeffRef(r,c);
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Rows, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, Eigen::Matrix<_Scalar, _Rows, -1, _Options, _MaxRows, _MaxCols> & mat) {
+    u_int32_t nCols = s.template get<u_int32_t>();
+    mat.resize(_Rows, nCols );
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s >> mat.coeffRef(r,c);
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Cols, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, Eigen::Matrix<_Scalar, -1, _Cols, _Options, _MaxRows, _MaxCols> & mat) {
+    u_int32_t nRows = s.template get<u_int32_t>();
+    mat.resize( nRows, _Cols );
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r){
+            s >> mat.coeffRef(r,c);
+        }
+    return s;
+}
+template<int Endian, typename Stream, typename _Scalar, int _Rows, int _Cols, int _Options, int _MaxRows, int _MaxCols>
+Serializer<Stream,Endian> & operator >> (Serializer<Stream,Endian> & s, Eigen::Matrix<_Scalar, _Rows, _Cols, _Options, _MaxRows, _MaxCols> & mat) {
+    for(int c=0; c<mat.cols(); ++c)
+        for(int r=0; r<mat.rows(); ++r)
+            s >> mat.coeffRef(r,c);
+    return s;
+}
+
+}   // namespace femto
+
